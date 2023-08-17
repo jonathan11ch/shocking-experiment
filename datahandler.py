@@ -23,8 +23,6 @@ class DataHandler(object):
         string = "0.0;initial_time;"+str(self.t0) + "\n"
         self.f.write(string)
 
-
-
     def register_event(self, name='name', val= 0):
         string = str(time.time()-self.t0) + ";" + name + ";" +str(val) +"\n"
         self.f.write(string)

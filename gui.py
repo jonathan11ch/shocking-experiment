@@ -1,18 +1,9 @@
-import typing
+#gui libraries
 from PyQt5 import QtCore
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QCheckBox
-from PyQt5.QtGui import QDoubleValidator
-from blackboxkit import BlackBoxKit
-from datahandler import DataHandler
-from utils import StoppableTimer
-from daq import StimulusGenerator
-import sys
-import time
-import threading
+from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QCheckBox, QStackedLayout
+from PyQt5.QtGui import QDoubleValidator, QPainter, QColor
 from PyQt5.QtCore import QTimer, pyqtSignal, QObject, QThread
-
-app = QApplication(sys.argv)
 
 class ConfigWidget(QWidget):
     def __init__(self, width = 100, height = 100):
@@ -137,163 +128,84 @@ class MainWidget(QWidget):
         self.ConfigWidget.show()
 
 
-class ProtocolSession(object):
+class CircularButton(QPushButton):
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setCheckable(True)
+        self.setChecked(False)
+        self.turn_off()
+        self.setText("Press")
+        
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        size = min(self.width(), self.height())
+        radius = size / 2
+        painter.setBrush(self.color)
+        painter.drawEllipse(0, 0, size, size)
+
+    def setColor(self, color):
+        self.color = color
+        self.update()
+ 
+    def turn_on(self):
+        self.setColor(QColor("blue"))
+        self.setText("Pressed")
+
+    def turn_off(self):
+        self.setColor(QColor("grey"))
+        self.setText("Press")
+
+    def minimumSizeHint(self):
+        return QSize(100, 100)
+
+
+class CircularShape(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumSize(20, 20)
+        self._color = QColor("red")
+
+    def setColor(self, color):
+        self._color = color
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        size = min(self.width(), self.height())
+        painter.setBrush(self._color)
+        painter.drawEllipse(0, 0, size, size)
+
+class VirtualBlackboxWidget(QWidget):
     def __init__(self):
-        self.MainWidget = MainWidget()
-        self.BlackBoxToolkit = BlackBoxKit(ser_port= 'COM4', ser_timeout=0.1)
-        self.BlackBoxToolkit.set_read_bytes(2)
-        self.BlackBoxToolkit.sample_time = 0.1
-        self.sample_time = 0.5
-        self.IS_ON = False
-        self.set_events()
-        self.StateMachine = StateMachine()
-        self.StimulusGenerator = StimulusGenerator()
+        super().__init__()
+        self.init_ui()
 
-    def set_events(self):
-        self.MainWidget.run_button.clicked.connect(self.on_start_experiment)
-        self.MainWidget.stop_button.clicked.connect(self.shutdown)
+    def init_ui(self):
+        self.setWindowTitle("Virtual BlackBoxKit")
+        self.circular_shape = CircularShape()
+        self.button = CircularButton("OFF")
+        self.button.clicked.connect(self.toggle_button)
+        self.setGeometry(0,0,250, 200)
+        layout = QVBoxLayout()
+        layout.addWidget(self.circular_shape, alignment=Qt.AlignCenter)
+        layout.addWidget(self.button, alignment=Qt.AlignCenter)
 
+        self.setLayout(layout)
 
+    def toggle_button(self):
+        if self.button.isChecked():
+            self.button.setText("ON")
+        else:
+            self.button.setText("OFF")
 
-    def on_start_experiment(self):
-        self.config = self.MainWidget.get_config()
-        self.delay_timer = StoppableTimer(self.config['resp_delay'], self.on_delay_timeup)
-        self.delay_timer.name = 'delay timer'
-        self.light_on_timer = StoppableTimer(self.config['resp_duration'], self.on_light_on_timeup)
-        self.light_on_timer.name = 'light_on timer'
-        self.IS_ON = True
-        self.StateMachine.handle_event('start')
+        # Reset the button's checkable state
+        #self.button.setChecked(False)     
+       
+
+    def turn_on_led(self):
+        self.circular_shape.setColor(QColor("green"))
         
-        
-        if self.BlackBoxToolkit.check_status():
-            self.initial_time = time.time()
-            self.t1 = threading.Thread(target= self.state_machine).start()
-        else:
-            print("Black Box Kit not connected")
-            
-    
-    def state_machine(self):
-        while self.IS_ON:
-            if self.StateMachine.current_state == "running":
-                print("Session thread running state")
-                self.button_data = self.BlackBoxToolkit.read_blackbox_serial()
-                if self.button_data == b'01':
-                    'clicked button'
-                    self.StateMachine.handle_event('clicked')
-                    
-                    'start running the delay timer'
-                    self.delay_timer.start()
-            else:
-                self.BlackBoxToolkit.flush_serial()
-                print("not in running")
-            time.sleep(self.sample_time)
-            #time.sleep(self.sample_time)
-        
-        self.final_time = time.time()
-        self.BlackBoxToolkit.shutdown()
-        self.MainWidget.close()
-        print("Session Ended")
-
-    def on_delay_timeup(self):
-        print("enter on_delay_timeup()")
-        self.StateMachine.handle_event('delay_timeup')
-        #self.delay_timer.stop()
-        if self.config['lock_resp']:
-            self.BlackBoxToolkit.turn_off()
-        else:
-            self.StimulusGenerator.launch_pulse(time = self.config['resp_duration'])
-            if self.config['turn_both']:
-                self.BlackBoxToolkit.turn_on_all()
-            elif self.config['led_on']:
-                self.BlackBoxToolkit.turn_on_led()
-            elif self.config['button_on']:
-                self.BlackBoxToolkit.turn_on_button()
-
-        self.light_on_timer.start()
-
-    def on_light_on_timeup(self):
-        self.StateMachine.handle_event('light_on_timeup')
-        self.BlackBoxToolkit.turn_off()
-        #self.light_on_timer.stop()
-
-
-    def shutdown(self):
-        self.StateMachine.handle_event('on_stop')
-        self.StimulusGenerator.shutdown()
-        time.sleep(1)
-        self.IS_ON = False
-        
-
-        
-
-class StateMachine(object):
-    def __init__(self):
-        self.states = {
-            'idle'  : self.idle_state,
-            'running' : self.running_state,
-            'delay' : self.delay_state,
-            'light_on': self.light_on_state,
-            'stop'  : self.stop_state
-        }
-        self.current_state = 'idle'
-        self.DataHandler = DataHandler()
-
-    def handle_event(self, event):
-        if event == 'on_stop':
-            print("stoppppppppppppppppppppppppp")
-            self.DataHandler.register_event(name='on_stop', val= -1)
-            self.DataHandler.shutdown()
-            self.current_state = 'stop'
-            stop_action = self.states['stop']
-            stop_action()
-        elif self.current_state in self.states:
-            action_method = self.states[self.current_state]
-            next_state = action_method(event)
-            if next_state  is not None:
-                self.current_state = next_state
-            else:
-                print("Invalid event")
-        else:
-            print("Invalid State")
-
-
-    def idle_state(self, event):
-        if event == 'start':
-            self.DataHandler.launch()
-            print("event: running")
-            return 'running'
-        else:
-            return self.current_state
-
-    def running_state(self, event):
-        if event == 'clicked':
-            self.DataHandler.register_event(name='clicked', val=1)
-            print("event: clicked")
-            return 'delay'
-        else:
-            return self.current_state
-
-    def delay_state(self, event):
-        if event == 'delay_timeup':
-            self.DataHandler.register_event(name='delay_timeup',val=2)
-            print("event: delay")
-            return 'light_on'
-        else:
-            return self.current_state
-
-    def light_on_state(self, event):
-        if event == 'light_on_timeup':
-            self.DataHandler.register_event(name='light_on_timeup', val=3)
-            print("event: light on")
-            return 'running'
-        else:
-            return self.current_state
-
-    def stop_state(self):
-            return self.current_state
-
-session = ProtocolSession()
-sys.exit(app.exec())
-
-
-
+    def turn_off_led(self):
+        self.circular_shape.setColor(QColor("red"))

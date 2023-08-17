@@ -1,7 +1,12 @@
-import serial
 import numpy
 import threading
 import time
+from gui import VirtualBlackboxWidget
+
+def custom_library(isVirtual = False):
+    if not isVirtual:
+        import serial
+
 
 class BlackBoxKit(object):
     def __init__(self,ser_port = "COM4", ser_timeout = 0.1, sample_time = 0.5):
@@ -12,9 +17,9 @@ class BlackBoxKit(object):
         self.sample_time  = sample_time
         self.serial = serial.Serial(self.ser_port, self.baudrate, timeout=self.ser_timeout)
         self.t = threading.Thread(target = self.read_blackbox_serial)
-        self.action_dict = {'turn_led': self.turn_on_led,
+        self.action_dict = {'turn_led'   : self.turn_on_led,
                             'turn_button': self.turn_on_button,
-                            'turn_both':self.turn_on_all}
+                            'turn_both'  : self.turn_on_all}
         self.IS_RUNNING = True
     
     def check_status(self):
@@ -76,6 +81,56 @@ class BlackBoxKit(object):
         self.IS_RUNNING =False
         self.serial.close()
         
+
+class VirtualBlackBoxKit(object):
+    def __init__(self,ser_port = "COM4", ser_timeout = 0.1, sample_time = 0.5):
+        self.baudrate = 115200
+        self.ser_timeout = ser_timeout
+        self.ser_port = ser_port 
+        self.bytes2read = 10
+        self.sample_time  = sample_time
+        self.VirtualBlackboxWidget = VirtualBlackboxWidget()
+        self.VirtualBlackboxWidget.show()
+
+    def set_read_bytes(self,bytes):
+        self.bytes2read = bytes
+
+    def check_status(self):
+        return True
+
+    def launch(self):
+        #launch gui with botton and two lights
+        pass
+
+    def turn_on_led(self):
+        self.VirtualBlackboxWidget.turn_on_led()
+
+    def turn_on_button(self):
+        self.VirtualBlackboxWidget.button.turn_on()
+
+    def turn_on_all(self):
+        self.turn_on_led()
+        self.turn_on_button()
+
+    def turn_off(self):
+        self.VirtualBlackboxWidget.turn_off_led()
+        self.VirtualBlackboxWidget.button.turn_off()
+
+    def flush_serial(self):
+        pass
+
+    def read_blackbox_serial(self):
+        if self.VirtualBlackboxWidget.button.isChecked():
+            self.data = b'01'
+        else:
+            self.data = b'00'
+        
+        return self.data
+
+    def shutdown(self):
+        self.VirtualBlackboxWidget.close()
+        pass    
+
 if __name__ == "__main__":
 
     kit = BlackBoxKit(ser_port= 'COM4', ser_timeout=0.1)

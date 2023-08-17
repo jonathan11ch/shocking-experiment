@@ -1,8 +1,15 @@
 import numpy as np
 import time
-import PyDAQmx as daq
 import threading
 from utils import StoppableTimer
+
+
+def custom_library(isVirtual = False):
+    if not isVirtual:
+        import PyDAQmx as daq
+        
+
+
 def analog_write():
     task = daq.Task()
 
@@ -108,7 +115,44 @@ class StimulusGenerator(object):
         self.task.ClearTask()
 
 
+class VirtualStimulusGenerator(object):
+    def __init__(self):
+        self.stim_duration = 1
+        self.sample_time = 0.1
+        # Create a task object
+        self.data = np.zeros((1,), dtype=np.uint8)
+        self.data[0] = 1
+        self.IS_ON = False
+        #launch virtual interface (gui?)
 
+    def launch_pulse(self, time):
+        self.IS_ON = True
+        self.t = threading.Thread(target = self.generate_pulse).start()
+        self.pulse_timer = StoppableTimer(time, self.stop_pulse)
+        self.pulse_timer.start()
+
+    def stop_pulse(self):
+        self.IS_ON =False
+
+    def generate_pulse(self):
+        #pulse_time = round(self.stim_duration/self.sample_time)
+        t1 = time.time()
+        while self.IS_ON:
+            #substitute for digial version
+            #self.task.WriteDigitalLines(1, 1, 10.0, daq.DAQmx_Val_GroupByChannel, self.data, None, None)
+            if self.data[0] == 1:
+                self.data[0] = 0
+            else:
+                self.data[0] = 1
+
+            time.sleep(self.sample_time)
+
+        t2 = time.time()
+        print(t2 - t1)
+
+
+    def shutdown(self):
+        pass
 
 
 if __name__ == "__main__":
