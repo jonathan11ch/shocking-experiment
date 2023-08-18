@@ -68,16 +68,23 @@ class ProtocolSession(object):
             if self.StateMachine.current_state == "running":
                 print("Session thread running state")
                 self.button_data = self.BlackBoxToolkit.read_blackbox_serial()
-                print("data from virtual thing")
-                print(self.button_data)
+                if isVirtual:
+                    print("data from virtual thing")
+                    print(self.button_data)
+                    
                 if self.button_data == b'01':
                     print('clicked button')
                     self.StateMachine.handle_event('clicked')
                     
                     'start running the delay timer'
                     self.delay_timer.start()
+                elif isVirtual:
+                    self.StimulusGenerator.VirtualStimulatorWidget.load_data(0)
+
             else:
                 self.BlackBoxToolkit.flush_serial()
+                if isVirtual:
+                    self.StimulusGenerator.VirtualStimulatorWidget.load_data(0)
                 print("not in running")
             time.sleep(self.sample_time)
             #time.sleep(self.sample_time)

@@ -2,7 +2,7 @@ import numpy as np
 import time
 import threading
 from utils import StoppableTimer
-
+from gui import VirtualStimulatorWidget
 
 def custom_library(isVirtual = False):
     if not isVirtual:
@@ -104,7 +104,6 @@ class StimulusGenerator(object):
                 self.data[0] = 0
             else:
                 self.data[0] = 1
-
             time.sleep(self.sample_time)
 
         t2 = time.time()
@@ -124,6 +123,8 @@ class VirtualStimulusGenerator(object):
         self.data[0] = 1
         self.IS_ON = False
         #launch virtual interface (gui?)
+        self.VirtualStimulatorWidget = VirtualStimulatorWidget()
+        self.VirtualStimulatorWidget.show()
 
     def launch_pulse(self, time):
         self.IS_ON = True
@@ -144,7 +145,7 @@ class VirtualStimulusGenerator(object):
                 self.data[0] = 0
             else:
                 self.data[0] = 1
-
+            self.VirtualStimulatorWidget.load_data(self.data[0])
             time.sleep(self.sample_time)
 
         t2 = time.time()
@@ -152,6 +153,7 @@ class VirtualStimulusGenerator(object):
 
 
     def shutdown(self):
+        self.VirtualStimulatorWidget.shutdown()
         pass
 
 

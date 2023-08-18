@@ -1,9 +1,17 @@
 #gui libraries
+import sys
+import numpy as np
+
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QCheckBox, QStackedLayout
 from PyQt5.QtGui import QDoubleValidator, QPainter, QColor
 from PyQt5.QtCore import QTimer, pyqtSignal, QObject, QThread
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+
 
 class ConfigWidget(QWidget):
     def __init__(self, width = 100, height = 100):
@@ -201,11 +209,56 @@ class VirtualBlackboxWidget(QWidget):
             self.button.setText("OFF")
 
         # Reset the button's checkable state
-        #self.button.setChecked(False)     
-       
+        #self.button.setChecked(False)        
 
     def turn_on_led(self):
         self.circular_shape.setColor(QColor("green"))
         
     def turn_off_led(self):
         self.circular_shape.setColor(QColor("red"))
+
+
+
+
+
+
+class VirtualStimulatorWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("Virtual Stimulator")
+
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.layout.addWidget(self.canvas)
+
+        self.ax = self.figure.add_subplot(111)
+        self.line, = self.ax.plot([], [], lw=2)
+
+        self.data = []
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_plot)
+        self.timer.start(100)  # Update every 100 milliseconds
+    
+    def load_data(self, data):
+        self.data.append(data)
+
+    def update_plot(self):
+        #self.data.append(np.random.random())  # Replace with your actual data source
+        
+        self.line.set_data(range(len(self.data)), self.data)
+        # Set fixed limits for the x and y axes
+        self.ax.set_xlim(0, len(self.data))  # Change the limits as needed
+        self.ax.set_ylim(-0.5, 1.5)  # Change the limits as needed
+        self.canvas.draw()
+
+    def shutdown(self):
+        self.timer.stop()
+        self.close()
